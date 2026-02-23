@@ -111,15 +111,17 @@ curl -X POST http://localhost:8000/api/chat \
   -d '{"message": "继续", "model": "claude-haiku", "conversation_id": "xxx"}'
 ```
 
-## 可用模型
+## 模型配置
 
-通过 LiteLLM 配置（`litellm_config.yaml`）：
+通过 LiteLLM 配置（`litellm_config.yaml`），前端可选模型：
 
-| 模型名 | 实际模型 |
-|--------|---------|
-| `claude-sonnet` | claude-sonnet-4-20250514 |
-| `claude-haiku` | claude-haiku-4-5-20251001 |
-| `claude-opus` | claude-opus-4-20250514 |
+| 前端选择 | LiteLLM 发出的 model 参数 |
+|---------|--------------------------|
+| `claude-sonnet` | `anthropic/claude-sonnet-4-20250514` |
+| `claude-haiku` | `anthropic/claude-haiku-4-5-20251001` |
+| `claude-opus` | `anthropic/claude-opus-4-20250514` |
+
+> **注意**：如果 `ANTHROPIC_BASE_URL` 配置了第三方服务地址，实际调用的模型取决于该服务如何处理请求，项目代码只保证将模型名正确传递。详见 [Phase 1 进度文档](docs/phase1-progress-2026-02-23.md) 中的验证方法。
 
 添加新模型：编辑 `litellm_config.yaml`，然后 `docker compose restart litellm`。
 
@@ -129,6 +131,20 @@ curl -X POST http://localhost:8000/api/chat \
 
 ```bash
 uv run pytest -v
+```
+
+### 查看数据库
+
+```bash
+# 进入 psql 交互终端
+docker compose exec postgres psql -U postgres -d k_assistant
+
+# 常用查询
+\dt                                          # 查看所有表
+SELECT * FROM users;                         # 查看用户
+SELECT id, title, model, created_at FROM conversations ORDER BY created_at DESC;  # 对话列表
+SELECT role, LEFT(content, 80), token_usage FROM messages ORDER BY created_at;    # 消息记录
+\q                                           # 退出
 ```
 
 ### 数据库迁移

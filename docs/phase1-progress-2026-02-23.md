@@ -112,15 +112,42 @@ k-assistant/
 4. **fetch + ReadableStream** — EventSource 只支持 GET，POST 需要 ReadableStream
 5. **pydantic-settings extra=ignore** — .env 中可放额外变量不报错
 
-## 可用模型
+## 模型配置与验证
 
-通过 LiteLLM 配置，当前注册了 3 个模型：
+### 当前配置
 
-- `claude-sonnet` → claude-sonnet-4-20250514
-- `claude-haiku` → claude-haiku-4-5-20251001
-- `claude-opus` → claude-opus-4-20250514
+通过 LiteLLM 配置（`litellm_config.yaml`），当前注册了 3 个模型别名：
 
-均通过 `ANTHROPIC_BASE_URL=https://api.minimaxi.com/anthropic` 代理访问。
+| 前端选择 | LiteLLM 发出的 model 参数 |
+|---------|--------------------------|
+| `claude-sonnet` | `anthropic/claude-sonnet-4-20250514` |
+| `claude-haiku` | `anthropic/claude-haiku-4-5-20251001` |
+| `claude-opus` | `anthropic/claude-opus-4-20250514` |
+
+### ANTHROPIC_BASE_URL 说明
+
+当前配置 `ANTHROPIC_BASE_URL=https://api.minimaxi.com/anthropic`。这是一个第三方服务地址，请求链路为：
+
+```
+FastAPI → LiteLLM → api.minimaxi.com/anthropic → ?
+```
+
+LiteLLM 向该地址发送的请求中包含 model 参数，但**该服务实际如何处理请求是不透明的**——它可能：
+- 原样转发到 Anthropic API（纯反代）
+- 映射到其他模型
+- 有自己的路由/降级逻辑
+
+**前端模型选择器的实际效果取决于该服务的行为**，项目代码只保证将用户选择的模型名正确传递给了 LiteLLM。
+
+### 如何验证实际调用的模型
+
+无法仅通过模型的自我声明来判断，以下方法可辅助验证：
+
+1. **对比能力差异** — 用同一道复杂推理题测试不同模型，如果回答质量明显不同，说明后端大概率路由到了不同模型
+2. **检查 LiteLLM 日志** — `docker compose logs litellm` 查看实际发出的请求参数
+3. **检查 response headers** — 部分代理会在响应头中透传原始模型信息
+4. **直连对比** — 如有条件，将 `ANTHROPIC_BASE_URL` 改为 `https://api.anthropic.com`（直连），对比同一问题的响应，确认第三方服务是否有差异
+5. **token 计费** — 登录 Anthropic 控制台查看 API 用量，确认是否有对应的调用记录（仅适用于使用自己的 API key 直连场景）
 
 ## 启动方式
 
