@@ -39,6 +39,8 @@ async def get_or_create_conversation(
     )
     db.add(conv)
     await db.flush()
+    # Eagerly load messages to avoid async lazy-load error
+    await db.refresh(conv, attribute_names=["messages"])
     return conv
 
 

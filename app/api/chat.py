@@ -1,7 +1,9 @@
 import uuid
 
+import structlog
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
+from openai import APIError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -9,7 +11,7 @@ from sqlalchemy.orm import selectinload
 from app.api.deps import get_current_user_id
 from app.core.chat import chat, chat_stream
 from app.core.llm import llm_client
-from app.db.session import get_db
+from app.db.session import async_session, get_db
 from app.models.conversation import Conversation
 from app.schemas.chat import (
     ChatRequest,
@@ -22,15 +24,22 @@ from app.schemas.chat import (
 router = APIRouter(prefix="/api")
 
 
+logger = structlog.get_logger()
+
+
 @router.post("/chat", response_model=ChatResponse)
 async def chat_endpoint(
     req: ChatRequest,
     db: AsyncSession = Depends(get_db),
     user_id: uuid.UUID = Depends(get_current_user_id),
 ):
-    conversation, assistant_msg = await chat(
-        db, user_id, req.message, req.conversation_id, req.model
-    )
+    try:
+        conversation, assistant_msg = await chat(
+            db, user_id, req.message, req.conversation_id, req.model
+        )
+    except APIError as e:
+        logger.error("chat.llm_error", status=e.status_code, message=str(e))
+        raise HTTPException(status_code=502, detail=f"LLM service error: {e.message}")
     return ChatResponse(
         conversation_id=conversation.id,
         message=MessageOut.model_validate(assistant_msg),
@@ -40,11 +49,21 @@ async def chat_endpoint(
 @router.post("/chat/stream")
 async def chat_stream_endpoint(
     req: ChatRequest,
-    db: AsyncSession = Depends(get_db),
     user_id: uuid.UUID = Depends(get_current_user_id),
 ):
+    async def generate():
+        async with async_session() as db:
+            try:
+                async for event in chat_stream(
+                    db, user_id, req.message, req.conversation_id, req.model
+                ):
+                    yield event
+            except Exception:
+                await db.rollback()
+                raise
+
     return StreamingResponse(
-        chat_stream(db, user_id, req.message, req.conversation_id, req.model),
+        generate(),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
