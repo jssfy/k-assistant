@@ -50,4 +50,5 @@ class TaskExecutionOut(BaseModel):
     result: str | None = None
     error: str | None = None
     token_usage: int | None = None
+    output_status: dict | None = None
     created_at: datetime

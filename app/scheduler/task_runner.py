@@ -11,6 +11,7 @@ Flow:
 
 import json
 import uuid
+from dataclasses import asdict
 from datetime import datetime, timezone
 
 import structlog
@@ -23,6 +24,7 @@ from app.core.tools import tool_manager
 from app.db.session import async_session
 from app.models.scheduled_task import ScheduledTask
 from app.models.task_execution import TaskExecution
+from app.output.router import dispatch
 
 logger = structlog.get_logger()
 
@@ -149,6 +151,15 @@ async def run_task(task_id: str):
             execution.token_usage = response.usage.get("total_tokens")
             execution.llm_messages = messages
             execution.tool_calls_log = tool_calls_log if tool_calls_log else None
+
+            # Dispatch output if configured
+            output_config = config.get("output")
+            if output_config and execution.status == "success":
+                try:
+                    send_results = await dispatch(output_config, response.content)
+                    execution.output_status = [asdict(r) for r in send_results]
+                except Exception:
+                    log.exception("task_runner.output_failed")
 
             log.info("task_runner.success", tokens=execution.token_usage)
 

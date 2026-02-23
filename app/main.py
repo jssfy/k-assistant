@@ -11,6 +11,9 @@ from app.api.tasks import router as tasks_router
 from app.config import settings
 from app.core.memory import memory_manager
 from app.core.tools import tool_manager
+from app.feishu.client import feishu_client
+from app.feishu.webhook import router as feishu_router
+from app.feishu.ws_listener import feishu_ws_listener
 from app.middleware.error_handler import global_exception_handler
 from app.middleware.logging import LoggingMiddleware
 from app.scheduler.engine import scheduler_engine
@@ -72,9 +75,17 @@ async def lifespan(app: FastAPI):
         # Sync active tasks from DB to scheduler
         await _sync_scheduler_tasks()
 
+    # Initialize Phase 4: Feishu
+    if settings.FEISHU_ENABLED:
+        await feishu_client.initialize()
+        await feishu_ws_listener.initialize()
+
     yield
 
     # Shutdown
+    if settings.FEISHU_ENABLED:
+        await feishu_ws_listener.shutdown()
+        await feishu_client.shutdown()
     if settings.SCHEDULER_ENABLED:
         scheduler_engine.shutdown()
     await tool_manager.shutdown()
@@ -99,6 +110,7 @@ app.add_exception_handler(Exception, global_exception_handler)
 # Routes
 app.include_router(chat_router)
 app.include_router(tasks_router)
+app.include_router(feishu_router)
 
 # Serve static files (built frontend) if available
 static_dir = Path(__file__).parent.parent / "static"

@@ -23,5 +23,13 @@ class Settings(BaseSettings):
     # Phase 3: Scheduler
     SCHEDULER_ENABLED: bool = True
 
+    # Phase 4: Feishu
+    FEISHU_ENABLED: bool = False
+    FEISHU_APP_ID: str = ""
+    FEISHU_APP_SECRET: str = ""
+    FEISHU_VERIFICATION_TOKEN: str = ""
+    FEISHU_ENCRYPT_KEY: str = ""
+    FEISHU_WEBHOOK_URL: str = ""  # Default group webhook
+
 
 settings = Settings()

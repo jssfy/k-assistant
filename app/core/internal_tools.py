@@ -63,19 +63,51 @@ MANAGE_TASKS_SCHEMA = {
     },
 }
 
+SEND_FEISHU_SCHEMA = {
+    "type": "function",
+    "function": {
+        "name": "send_feishu",
+        "description": (
+            "Send a message to Feishu (飞书). "
+            "Use this when the user wants to send content to a Feishu group or person. "
+            "Examples: '把这个发到飞书群', '发送摘要到飞书', 'send this to Feishu'."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "content": {
+                    "type": "string",
+                    "description": "The text content to send to Feishu.",
+                },
+                "target": {
+                    "type": "string",
+                    "description": (
+                        "Optional: Feishu webhook URL or chat_id. "
+                        "If not provided, uses the default webhook."
+                    ),
+                },
+            },
+            "required": ["content"],
+        },
+    },
+}
+
 INTERNAL_TOOLS_SCHEMAS = [MANAGE_TASKS_SCHEMA]
 
 
 def get_internal_tools_schemas() -> list[dict]:
     """Return all internal tool schemas in OpenAI function calling format."""
-    if not settings.SCHEDULER_ENABLED:
-        return []
-    return INTERNAL_TOOLS_SCHEMAS
+    schemas = []
+    if settings.SCHEDULER_ENABLED:
+        schemas.append(MANAGE_TASKS_SCHEMA)
+    if settings.FEISHU_ENABLED:
+        schemas.append(SEND_FEISHU_SCHEMA)
+    return schemas
 
 
 def is_internal_tool(name: str) -> bool:
     """Check if a tool name belongs to an internal tool."""
-    return name in {"manage_tasks"}
+    return name in {"manage_tasks", "send_feishu"}
 
 
 async def execute_internal_tool(
@@ -84,6 +116,8 @@ async def execute_internal_tool(
     """Execute an internal tool and return text result."""
     if name == "manage_tasks":
         return await _execute_manage_tasks(arguments, user_id, db)
+    if name == "send_feishu":
+        return await _execute_send_feishu(arguments)
     return f"Error: Unknown internal tool '{name}'"
 
 
@@ -260,6 +294,24 @@ async def _action_toggle(
         is_active=task.is_active,
     )
     return f"Task '{task.name}' (ID: {task_id}) has been {status_msg}."
+
+
+async def _execute_send_feishu(arguments: dict) -> str:
+    """Send a message to Feishu via webhook or bot API."""
+    from app.output.feishu import send_feishu
+
+    content = arguments.get("content")
+    if not content:
+        return "Error: 'content' is required."
+
+    target = arguments.get("target") or settings.FEISHU_WEBHOOK_URL
+    if not target:
+        return "Error: No target specified and no default FEISHU_WEBHOOK_URL configured."
+
+    result = await send_feishu(target, content)
+    if result.success:
+        return f"Message sent to Feishu successfully (target: {target[:60]})."
+    return f"Failed to send to Feishu: {result.error}"
 
 
 async def _get_user_task(

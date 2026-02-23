@@ -28,6 +28,7 @@ class TaskExecution(Base, UUIDPrimaryKeyMixin):
     result: Mapped[str | None] = mapped_column(Text, nullable=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     token_usage: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    output_status: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
