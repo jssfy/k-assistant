@@ -2,7 +2,7 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+    model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/k_assistant"
     LITELLM_BASE_URL: str = "http://localhost:4000/v1"
