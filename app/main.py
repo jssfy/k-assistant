@@ -7,11 +7,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.api.chat import router as chat_router
+from app.api.tasks import router as tasks_router
 from app.config import settings
 from app.core.memory import memory_manager
 from app.core.tools import tool_manager
 from app.middleware.error_handler import global_exception_handler
 from app.middleware.logging import LoggingMiddleware
+from app.scheduler.engine import scheduler_engine
+
+
+logger = structlog.get_logger()
 
 
 def configure_logging():
@@ -35,19 +40,43 @@ def configure_logging():
     )
 
 
+async def _sync_scheduler_tasks():
+    """Restore active tasks from DB into the scheduler after restart."""
+    from sqlalchemy import select
+    from app.db.session import async_session
+    from app.models.scheduled_task import ScheduledTask
+
+    async with async_session() as db:
+        result = await db.execute(
+            select(ScheduledTask).where(ScheduledTask.is_active.is_(True))
+        )
+        tasks = result.scalars().all()
+        for task in tasks:
+            scheduler_engine.add_task(task.id, task.cron_expression, task.timezone)
+        if tasks:
+            logger.info("scheduler.synced_tasks", count=len(tasks))
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     configure_logging()
-    logger = structlog.get_logger()
     logger.info("app.startup", env=settings.APP_ENV)
 
     # Initialize Phase 2 subsystems
     await memory_manager.initialize()
     await tool_manager.initialize()
 
+    # Initialize Phase 3: Scheduler
+    if settings.SCHEDULER_ENABLED:
+        scheduler_engine.start()
+        # Sync active tasks from DB to scheduler
+        await _sync_scheduler_tasks()
+
     yield
 
     # Shutdown
+    if settings.SCHEDULER_ENABLED:
+        scheduler_engine.shutdown()
     await tool_manager.shutdown()
     logger.info("app.shutdown")
 
@@ -69,6 +98,7 @@ app.add_exception_handler(Exception, global_exception_handler)
 
 # Routes
 app.include_router(chat_router)
+app.include_router(tasks_router)
 
 # Serve static files (built frontend) if available
 static_dir = Path(__file__).parent.parent / "static"

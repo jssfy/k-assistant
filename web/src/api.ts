@@ -1,4 +1,4 @@
-import type { ChatResponse, Conversation, MemoryItem, ModelInfo, ToolCallInfo } from './types'
+import type { ChatResponse, Conversation, MemoryItem, ModelInfo, ScheduledTask, TaskExecution, ToolCallInfo } from './types'
 
 const API_BASE = '/api'
 
@@ -135,4 +135,33 @@ export async function searchMemories(query: string): Promise<MemoryItem[]> {
 export async function deleteMemory(id: string): Promise<void> {
   const res = await fetch(`${API_BASE}/memories/${encodeURIComponent(id)}`, { method: 'DELETE' })
   if (!res.ok) throw new Error(`Failed to delete memory: ${res.status}`)
+}
+
+// Tasks API
+
+export async function listTasks(): Promise<ScheduledTask[]> {
+  const res = await fetch(`${API_BASE}/tasks`)
+  if (!res.ok) throw new Error(`Failed to list tasks: ${res.status}`)
+  return res.json()
+}
+
+export async function deleteTask(id: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/tasks/${id}`, { method: 'DELETE' })
+  if (!res.ok) throw new Error(`Failed to delete task: ${res.status}`)
+}
+
+export async function toggleTask(id: string, is_active: boolean): Promise<ScheduledTask> {
+  const res = await fetch(`${API_BASE}/tasks/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ is_active }),
+  })
+  if (!res.ok) throw new Error(`Failed to update task: ${res.status}`)
+  return res.json()
+}
+
+export async function listTaskExecutions(taskId: string): Promise<TaskExecution[]> {
+  const res = await fetch(`${API_BASE}/tasks/${taskId}/executions`)
+  if (!res.ok) throw new Error(`Failed to list executions: ${res.status}`)
+  return res.json()
 }

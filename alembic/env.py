@@ -9,7 +9,7 @@ from alembic import context
 
 from app.config import settings
 from app.db.base import Base
-from app.models import Conversation, Message, User  # noqa: F401
+from app.models import Conversation, Message, ScheduledTask, TaskExecution, User  # noqa: F401
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)

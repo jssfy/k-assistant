@@ -6,7 +6,8 @@ import {
   streamMessage,
 } from './api'
 import ChatArea from './components/ChatArea'
-import Sidebar from './components/Sidebar'
+import Sidebar, { type ViewType } from './components/Sidebar'
+import TasksPanel from './components/TasksPanel'
 import type { Conversation, Message, ToolCallInfo } from './types'
 
 export default function App() {
@@ -18,6 +19,7 @@ export default function App() {
   const [model, setModel] = useState('claude-sonnet')
   const [streamingToolCalls, setStreamingToolCalls] = useState<ToolCallInfo[]>([])
   const toolCallsRef = useRef<ToolCallInfo[]>([])
+  const [view, setView] = useState<ViewType>('chat')
 
   const refreshConversations = useCallback(async () => {
     try {
@@ -149,16 +151,22 @@ export default function App() {
         onSelect={loadConversation}
         onNew={handleNewChat}
         onDelete={handleDelete}
+        view={view}
+        onViewChange={setView}
       />
-      <ChatArea
-        messages={messages}
-        streamingContent={streamingContent}
-        streamingToolCalls={streamingToolCalls}
-        isStreaming={isStreaming}
-        model={model}
-        onModelChange={setModel}
-        onSend={handleSend}
-      />
+      {view === 'chat' ? (
+        <ChatArea
+          messages={messages}
+          streamingContent={streamingContent}
+          streamingToolCalls={streamingToolCalls}
+          isStreaming={isStreaming}
+          model={model}
+          onModelChange={setModel}
+          onSend={handleSend}
+        />
+      ) : (
+        <TasksPanel />
+      )}
     </div>
   )
 }

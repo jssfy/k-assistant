@@ -94,7 +94,7 @@ class ToolManager:
             logger.info("tools.registered", server=name, tool=tool.name)
 
     def get_tools_schema(self) -> list[dict]:
-        """Return all tools in OpenAI function calling format."""
+        """Return MCP tools in OpenAI function calling format (excludes internal tools)."""
         tools = []
         for tool_name, conn in self._tool_map.items():
             for tool in conn.tools:
@@ -107,6 +107,14 @@ class ToolManager:
                             "parameters": tool.inputSchema,
                         },
                     })
+        return tools
+
+    def get_all_tools_schema(self) -> list[dict]:
+        """Return all tools (MCP + internal) in OpenAI function calling format."""
+        from app.core.internal_tools import get_internal_tools_schemas
+
+        tools = self.get_tools_schema()
+        tools.extend(get_internal_tools_schemas())
         return tools
 
     async def execute_tool(self, name: str, arguments: dict) -> str:
@@ -130,6 +138,14 @@ class ToolManager:
     @property
     def has_tools(self) -> bool:
         return len(self._tool_map) > 0
+
+    @property
+    def has_any_tools(self) -> bool:
+        """Check if any tools (MCP or internal) are available."""
+        if self.has_tools:
+            return True
+        from app.core.internal_tools import get_internal_tools_schemas
+        return len(get_internal_tools_schemas()) > 0
 
     async def shutdown(self):
         """Close all MCP server connections."""

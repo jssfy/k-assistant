@@ -11,6 +11,7 @@ from sqlalchemy.orm import selectinload
 from app.config import settings
 from app.core.llm import LLMResponse, ToolCall, llm_client
 from app.core.memory import memory_manager
+from app.core.internal_tools import execute_internal_tool, is_internal_tool
 from app.core.tools import tool_manager
 from app.models.conversation import Conversation
 from app.models.message import Message
@@ -93,7 +94,11 @@ def build_messages(
     return messages
 
 
-async def _execute_tool_calls(tool_calls: list[ToolCall]) -> list[dict]:
+async def _execute_tool_calls(
+    tool_calls: list[ToolCall],
+    user_id: uuid.UUID | None = None,
+    db: AsyncSession | None = None,
+) -> list[dict]:
     """Execute tool calls and return tool result messages for the LLM."""
     results = []
     for tc in tool_calls:
@@ -102,7 +107,11 @@ async def _execute_tool_calls(tool_calls: list[ToolCall]) -> list[dict]:
         except json.JSONDecodeError:
             arguments = {}
 
-        result_text = await tool_manager.execute_tool(tc.name, arguments)
+        if is_internal_tool(tc.name) and user_id and db:
+            result_text = await execute_internal_tool(tc.name, arguments, user_id, db)
+        else:
+            result_text = await tool_manager.execute_tool(tc.name, arguments)
+
         results.append({
             "role": "tool",
             "tool_call_id": tc.id,
@@ -135,9 +144,9 @@ async def _set_title(db: AsyncSession, conversation: Conversation, first_message
 
 
 def _get_tools() -> list[dict] | None:
-    """Get tool schemas if tools are available, else None."""
-    if tool_manager.has_tools:
-        return tool_manager.get_tools_schema()
+    """Get all tool schemas (MCP + internal) if any are available, else None."""
+    if tool_manager.has_any_tools:
+        return tool_manager.get_all_tools_schema()
     return None
 
 
@@ -190,7 +199,7 @@ async def chat(
         })
 
         # Execute tools and append results
-        tool_results = await _execute_tool_calls(response.tool_calls)
+        tool_results = await _execute_tool_calls(response.tool_calls, user_id, db)
         messages.extend(tool_results)
 
         # Next LLM call
@@ -292,7 +301,7 @@ async def chat_stream(
             })
 
             # Execute tools
-            tool_results = await _execute_tool_calls(tool_calls_in_round)
+            tool_results = await _execute_tool_calls(tool_calls_in_round, user_id, db)
             messages.extend(tool_results)
 
             # Emit tool result events

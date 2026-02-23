@@ -20,5 +20,8 @@ class Settings(BaseSettings):
     # Phase 2: MCP Tools
     MCP_SERVERS_CONFIG: str = "mcp_servers.json"
 
+    # Phase 3: Scheduler
+    SCHEDULER_ENABLED: bool = True
+
 
 settings = Settings()

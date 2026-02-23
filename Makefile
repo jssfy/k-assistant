@@ -30,9 +30,17 @@ down: ## 停止 Docker 服务
 # === 开发 ===
 
 dev: up ## 启动全部（Docker + 后端 + 前端）
-	@trap 'kill 0' EXIT; \
-	uv run uvicorn app.main:app --reload --port 8000 & \
-	pnpm --dir web dev & \
+	@cleanup() { \
+		echo ""; echo "Stopping..."; \
+		kill $$API_PID $$WEB_PID 2>/dev/null; \
+		wait $$API_PID $$WEB_PID 2>/dev/null; \
+		lsof -ti :8000 | xargs kill 2>/dev/null; \
+		lsof -ti :5173 | xargs kill 2>/dev/null; \
+		echo "All stopped"; \
+	}; \
+	trap cleanup INT TERM EXIT; \
+	uv run uvicorn app.main:app --reload --port 8000 & API_PID=$$!; \
+	pnpm --dir web dev & WEB_PID=$$!; \
 	wait
 
 dev-api: up ## 仅启动后端
