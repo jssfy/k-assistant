@@ -8,6 +8,8 @@ from fastapi.staticfiles import StaticFiles
 
 from app.api.chat import router as chat_router
 from app.config import settings
+from app.core.memory import memory_manager
+from app.core.tools import tool_manager
 from app.middleware.error_handler import global_exception_handler
 from app.middleware.logging import LoggingMiddleware
 
@@ -38,7 +40,15 @@ async def lifespan(app: FastAPI):
     configure_logging()
     logger = structlog.get_logger()
     logger.info("app.startup", env=settings.APP_ENV)
+
+    # Initialize Phase 2 subsystems
+    await memory_manager.initialize()
+    await tool_manager.initialize()
+
     yield
+
+    # Shutdown
+    await tool_manager.shutdown()
     logger.info("app.shutdown")
 
 

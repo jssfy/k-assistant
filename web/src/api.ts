@@ -1,4 +1,4 @@
-import type { ChatResponse, Conversation, ModelInfo } from './types'
+import type { ChatResponse, Conversation, MemoryItem, ModelInfo, ToolCallInfo } from './types'
 
 const API_BASE = '/api'
 
@@ -28,6 +28,8 @@ export async function streamMessage(
   onMetadata: (data: { conversation_id: string; model: string }) => void = () => {},
   onDone: (data: { message_id: string }) => void = () => {},
   onError: (error: string) => void = () => {},
+  onToolCall: (data: ToolCallInfo) => void = () => {},
+  onToolResult: (data: { tool: string; result: string }) => void = () => {},
 ): Promise<void> {
   const res = await fetch(`${API_BASE}/chat/stream`, {
     method: 'POST',
@@ -40,7 +42,8 @@ export async function streamMessage(
   })
   if (!res.ok) throw new Error(`Stream failed: ${res.status}`)
 
-  const reader = res.body!.getReader()
+  if (!res.body) throw new Error('Stream response has no body')
+  const reader = res.body.getReader()
   const decoder = new TextDecoder()
   let buffer = ''
 
@@ -57,7 +60,14 @@ export async function streamMessage(
       if (line.startsWith('event: ')) {
         eventType = line.slice(7)
       } else if (line.startsWith('data: ') && eventType) {
-        const data = JSON.parse(line.slice(6))
+        let data: Record<string, unknown>
+        try {
+          data = JSON.parse(line.slice(6))
+        } catch {
+          onError(`Failed to parse server event: ${line}`)
+          eventType = ''
+          continue
+        }
         switch (eventType) {
           case 'message':
             onDelta(data.content)
@@ -70,6 +80,12 @@ export async function streamMessage(
             break
           case 'error':
             onError(data.message)
+            break
+          case 'tool_call':
+            onToolCall({ ...data, status: 'calling' })
+            break
+          case 'tool_result':
+            onToolResult(data)
             break
         }
         eventType = ''
@@ -100,4 +116,23 @@ export async function listModels(): Promise<ModelInfo[]> {
   if (!res.ok) throw new Error(`Failed to list models: ${res.status}`)
   const data = await res.json()
   return data.models
+}
+
+// Memory API
+
+export async function listMemories(): Promise<MemoryItem[]> {
+  const res = await fetch(`${API_BASE}/memories`)
+  if (!res.ok) throw new Error(`Failed to list memories: ${res.status}`)
+  return res.json()
+}
+
+export async function searchMemories(query: string): Promise<MemoryItem[]> {
+  const res = await fetch(`${API_BASE}/memories/search?q=${encodeURIComponent(query)}`)
+  if (!res.ok) throw new Error(`Failed to search memories: ${res.status}`)
+  return res.json()
+}
+
+export async function deleteMemory(id: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/memories/${encodeURIComponent(id)}`, { method: 'DELETE' })
+  if (!res.ok) throw new Error(`Failed to delete memory: ${res.status}`)
 }

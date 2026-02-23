@@ -13,5 +13,12 @@ class Settings(BaseSettings):
     # Phase 1: hardcoded default user
     DEFAULT_USER_ID: str = "00000000-0000-0000-0000-000000000001"
 
+    # Phase 2: Memory (Mem0)
+    MEM0_ENABLED: bool = True
+    MEM0_COLLECTION_NAME: str = "k_assistant"
+
+    # Phase 2: MCP Tools
+    MCP_SERVERS_CONFIG: str = "mcp_servers.json"
+
 
 settings = Settings()

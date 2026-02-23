@@ -11,6 +11,7 @@ from sqlalchemy.orm import selectinload
 from app.api.deps import get_current_user_id
 from app.core.chat import chat, chat_stream
 from app.core.llm import llm_client
+from app.core.memory import memory_manager
 from app.db.session import async_session, get_db
 from app.models.conversation import Conversation
 from app.schemas.chat import (
@@ -18,6 +19,7 @@ from app.schemas.chat import (
     ChatResponse,
     ConversationDetailOut,
     ConversationOut,
+    MemoryOut,
     MessageOut,
 )
 
@@ -123,3 +125,49 @@ async def delete_conversation(
 async def list_models():
     models = await llm_client.list_models()
     return {"models": models}
+
+
+# === Memory endpoints ===
+
+
+@router.get("/memories", response_model=list[MemoryOut])
+async def list_memories(
+    user_id: uuid.UUID = Depends(get_current_user_id),
+):
+    if not memory_manager.enabled:
+        return []
+    memories = await memory_manager.list(str(user_id))
+    return [_mem_to_out(m) for m in memories]
+
+
+@router.get("/memories/search", response_model=list[MemoryOut])
+async def search_memories(
+    q: str,
+    user_id: uuid.UUID = Depends(get_current_user_id),
+):
+    if not memory_manager.enabled:
+        return []
+    memories = await memory_manager.search(str(user_id), q)
+    return [_mem_to_out(m) for m in memories]
+
+
+@router.delete("/memories/{memory_id}", status_code=204)
+async def delete_memory(
+    memory_id: str,
+    user_id: uuid.UUID = Depends(get_current_user_id),
+):
+    if not memory_manager.enabled:
+        raise HTTPException(status_code=503, detail="Memory system not enabled")
+    success = await memory_manager.delete(memory_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Memory not found")
+
+
+def _mem_to_out(m: dict) -> MemoryOut:
+    return MemoryOut(
+        id=m.get("id", ""),
+        memory=m.get("memory", ""),
+        metadata=m.get("metadata"),
+        created_at=m.get("created_at"),
+        updated_at=m.get("updated_at"),
+    )

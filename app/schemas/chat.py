@@ -38,3 +38,11 @@ class ConversationDetailOut(ConversationOut):
 class ChatResponse(BaseModel):
     conversation_id: uuid.UUID
     message: MessageOut
+
+
+class MemoryOut(BaseModel):
+    id: str
+    memory: str
+    metadata: dict | None = None
+    created_at: str | None = None
+    updated_at: str | None = None

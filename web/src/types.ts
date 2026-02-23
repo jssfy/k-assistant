@@ -1,3 +1,10 @@
+export interface ToolCallInfo {
+  tool: string
+  arguments: Record<string, unknown>
+  result?: string
+  status: 'calling' | 'done'
+}
+
 export interface Message {
   id: string
   role: 'user' | 'assistant' | 'system'
@@ -5,6 +12,7 @@ export interface Message {
   model?: string
   token_usage?: number
   created_at: string
+  tool_calls?: ToolCallInfo[]
 }
 
 export interface Conversation {
@@ -24,4 +32,12 @@ export interface ChatResponse {
 export interface ModelInfo {
   id: string
   owned_by: string
+}
+
+export interface MemoryItem {
+  id: string
+  memory: string
+  metadata: Record<string, unknown> | null
+  created_at: string | null
+  updated_at: string | null
 }

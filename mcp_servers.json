@@ -1,0 +1,10 @@
+{
+  "servers": [
+    {
+      "name": "web-search",
+      "command": "python",
+      "args": ["-m", "mcp_servers.web_search"],
+      "env": {}
+    }
+  ]
+}

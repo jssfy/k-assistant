@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   deleteConversation,
   getConversation,
@@ -7,7 +7,7 @@ import {
 } from './api'
 import ChatArea from './components/ChatArea'
 import Sidebar from './components/Sidebar'
-import type { Conversation, Message } from './types'
+import type { Conversation, Message, ToolCallInfo } from './types'
 
 export default function App() {
   const [conversations, setConversations] = useState<Conversation[]>([])
@@ -16,6 +16,8 @@ export default function App() {
   const [streamingContent, setStreamingContent] = useState('')
   const [isStreaming, setIsStreaming] = useState(false)
   const [model, setModel] = useState('claude-sonnet')
+  const [streamingToolCalls, setStreamingToolCalls] = useState<ToolCallInfo[]>([])
+  const toolCallsRef = useRef<ToolCallInfo[]>([])
 
   const refreshConversations = useCallback(async () => {
     try {
@@ -45,6 +47,8 @@ export default function App() {
     setActiveConvId(null)
     setMessages([])
     setStreamingContent('')
+    setStreamingToolCalls([])
+    toolCallsRef.current = []
   }
 
   const handleDelete = async (id: string) => {
@@ -68,6 +72,8 @@ export default function App() {
     setMessages((prev) => [...prev, tempUserMsg])
     setIsStreaming(true)
     setStreamingContent('')
+    setStreamingToolCalls([])
+    toolCallsRef.current = []
 
     try {
       let convId = activeConvId
@@ -93,6 +99,8 @@ export default function App() {
             setMessages(conv.messages || [])
           }
           setStreamingContent('')
+          setStreamingToolCalls([])
+          toolCallsRef.current = []
           setIsStreaming(false)
           refreshConversations()
         },
@@ -100,12 +108,35 @@ export default function App() {
         (error) => {
           console.error('Stream error:', error)
           setStreamingContent('')
+          setStreamingToolCalls([])
+          toolCallsRef.current = []
           setIsStreaming(false)
+        },
+        // onToolCall
+        (data) => {
+          const newTc: ToolCallInfo = {
+            tool: data.tool,
+            arguments: data.arguments,
+            status: 'calling',
+          }
+          toolCallsRef.current = [...toolCallsRef.current, newTc]
+          setStreamingToolCalls([...toolCallsRef.current])
+        },
+        // onToolResult
+        (data) => {
+          toolCallsRef.current = toolCallsRef.current.map((tc) =>
+            tc.tool === data.tool && tc.status === 'calling'
+              ? { ...tc, result: data.result, status: 'done' as const }
+              : tc,
+          )
+          setStreamingToolCalls([...toolCallsRef.current])
         },
       )
     } catch (err) {
       console.error('Failed to send message', err)
       setStreamingContent('')
+      setStreamingToolCalls([])
+      toolCallsRef.current = []
       setIsStreaming(false)
     }
   }
@@ -122,6 +153,7 @@ export default function App() {
       <ChatArea
         messages={messages}
         streamingContent={streamingContent}
+        streamingToolCalls={streamingToolCalls}
         isStreaming={isStreaming}
         model={model}
         onModelChange={setModel}

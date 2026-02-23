@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import type { Message } from '../types'
+import type { Message, ToolCallInfo } from '../types'
 import ChatInput from './ChatInput'
 import MessageBubble from './MessageBubble'
 import ModelSelector from './ModelSelector'
@@ -7,6 +7,7 @@ import ModelSelector from './ModelSelector'
 interface Props {
   messages: Message[]
   streamingContent: string
+  streamingToolCalls?: ToolCallInfo[]
   isStreaming: boolean
   model: string
   onModelChange: (model: string) => void
@@ -16,6 +17,7 @@ interface Props {
 export default function ChatArea({
   messages,
   streamingContent,
+  streamingToolCalls = [],
   isStreaming,
   model,
   onModelChange,
@@ -25,7 +27,7 @@ export default function ChatArea({
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, streamingContent])
+  }, [messages, streamingContent, streamingToolCalls])
 
   return (
     <div className="flex-1 flex flex-col h-full">
@@ -47,13 +49,14 @@ export default function ChatArea({
           {messages.map((msg) => (
             <MessageBubble key={msg.id} message={msg} />
           ))}
-          {isStreaming && streamingContent && (
+          {isStreaming && (streamingContent || streamingToolCalls.length > 0) && (
             <MessageBubble
               message={{
                 id: 'streaming',
                 role: 'assistant',
                 content: streamingContent,
                 created_at: new Date().toISOString(),
+                tool_calls: streamingToolCalls.length > 0 ? streamingToolCalls : undefined,
               }}
             />
           )}
