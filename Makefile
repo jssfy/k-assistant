@@ -1,4 +1,4 @@
-.PHONY: help setup db-init up down dev dev-api dev-web test psql logs
+.PHONY: help setup db-init up down dev dev-api dev-web kill kill-all test psql logs
 
 help: ## 显示帮助
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -40,6 +40,12 @@ dev-api: up ## 仅启动后端
 
 dev-web: ## 仅启动前端
 	pnpm --dir web dev
+
+kill: ## 停止本地前后端进程
+	@lsof -ti :8000 | xargs kill 2>/dev/null && echo "Backend stopped" || echo "Backend not running"
+	@lsof -ti :5173 | xargs kill 2>/dev/null && echo "Frontend stopped" || echo "Frontend not running"
+
+kill-all: down kill ## 停止全部（Docker + 本地进程）
 
 # === 工具 ===
 

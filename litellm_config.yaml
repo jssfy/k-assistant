@@ -17,5 +17,8 @@ model_list:
       api_key: os.environ/ANTHROPIC_API_KEY
       api_base: os.environ/ANTHROPIC_BASE_URL
 
+litellm_settings:
+  drop_params: true
+
 general_settings:
   master_key: sk-1234
